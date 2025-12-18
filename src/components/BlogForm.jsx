@@ -1,5 +1,6 @@
+// src/components/BlogForm.jsx
 import PropTypes from 'prop-types'
-import Togglable from './Togglable'
+
 const BlogForm = ({
   onSubmit,
   title,
@@ -10,17 +11,30 @@ const BlogForm = ({
   handleUrlChange
 }) => {
   return (
-  <Togglable buttonLabel="new blog">
-    <BlogForm
-      onSubmit={addBlog}
-      title={newTitle}
-      author={newAuthor}
-      url={newUrl}
-      handleTitleChange={({ target }) => setNewTitle(target.value)}
-      handleAuthorChange={({ target }) => setNewAuthor(target.value)}
-      handleUrlChange={({ target }) => setNewUrl(target.value)}
-    />
-  </Togglable>
+    <form onSubmit={onSubmit}>
+      <div>
+        title
+        <input
+          value={title}
+          onChange={handleTitleChange}
+        />
+      </div>
+      <div>
+        author
+        <input
+          value={author}
+          onChange={handleAuthorChange}
+        />
+      </div>
+      <div>
+        url
+        <input
+          value={url}
+          onChange={handleUrlChange}
+        />
+      </div>
+      <button type="submit">create</button>
+    </form>
   )
 }
 
