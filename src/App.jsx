@@ -110,30 +110,32 @@ const App = () => {
     setBlogs(blogs.filter(b => b.id !== blog.id))
   }
 
-  const loginForm = () => (
-    <form onSubmit={handleLogin}>
-      <div>
-        username
-        <input
-          type="text"
-          name="username"
-          placeholder="username"
-          value={username}
-          onChange={({ target }) => setUsername(target.value)}
-        />
-      </div>
-      <div>
-        password
-        <input
-          type="password"
-          name="password"
-          placeholder="password"
-          value={password}
-          onChange={({ target }) => setPassword(target.value)}
-        />
-      </div>
-    </form>
-  )
+    const loginForm = () => (
+      <form onSubmit={handleLogin}>
+        <div>
+          username
+          <input
+            type="text"
+            name="username"
+            placeholder="username"
+            value={username}
+            onChange={({ target }) => setUsername(target.value)}
+          />
+        </div>
+        <div>
+          password
+          <input
+            type="password"
+            name="password"
+            placeholder="password"
+            value={password}
+            onChange={({ target }) => setPassword(target.value)}
+          />
+        </div>
+        <button type="submit">login</button>  {/* додай цей рядок */}
+      </form>
+    )
+
 
   if (user === null) {
     return (
@@ -144,10 +146,7 @@ const App = () => {
       </div>
     )
   }
-    if (!Array.isArray(blogs)) {
-      console.log('blogs is NOT array:', blogs)
-      return null
-    }
+
     return (
     <div>
       <h2>blogs</h2>
