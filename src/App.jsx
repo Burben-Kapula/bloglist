@@ -141,8 +141,11 @@ const App = () => {
       </div>
     )
   }
-console.log('blogs:', blogs, 'isArray?', Array.isArray(blogs))
-  return (
+    if (!Array.isArray(blogs)) {
+      console.log('blogs is NOT array:', blogs)
+      return null
+    }
+    return (
     <div>
       <h2>blogs</h2>
       <Notification message={notification} />
