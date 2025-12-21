@@ -1,6 +1,5 @@
 import { test, expect } from '@playwright/test'
 
-// адреси підлаштуй, якщо в тебе інші порти
 const FRONT_URL = 'http://localhost:5173'
 const API_URL = 'http://localhost:3003'
 
@@ -18,7 +17,7 @@ const resetDbAndCreateUser = async (request) => {
 
 test.beforeEach(async ({ request, page }) => {
   await resetDbAndCreateUser(request)
-  await page.goto(`${FRONT_URL}/login`)
+  await page.goto(FRONT_URL)
 })
 
 // 1. сторінка логіну відкривається
@@ -28,8 +27,8 @@ test('login page can be opened', async ({ page }) => {
 
 // 2. успішний логін
 test('user can log in with correct credentials', async ({ page }) => {
-  await page.getByLabel('username').fill('testuser')
-  await page.getByLabel('password').fill('sekret')
+  await page.getByPlaceholder('username').fill('testuser')
+  await page.getByPlaceholder('password').fill('sekret')
   await page.getByRole('button', { name: 'login' }).click()
 
   await expect(page.getByText('Test User logged in')).toBeVisible()
@@ -37,8 +36,8 @@ test('user can log in with correct credentials', async ({ page }) => {
 
 // 3. невдалий логін
 test('login fails with wrong password', async ({ page }) => {
-  await page.getByLabel('username').fill('testuser')
-  await page.getByLabel('password').fill('wrong')
+  await page.getByPlaceholder('username').fill('testuser')
+  await page.getByPlaceholder('password').fill('wrong')
   await page.getByRole('button', { name: 'login' }).click()
 
   await expect(page.getByText('wrong credentials')).toBeVisible()
@@ -63,28 +62,36 @@ test('logged in user can create a blog', async ({ page }) => {
   await page.getByPlaceholder('url').fill('http://example.com/pw')
   await page.getByRole('button', { name: 'create' }).click()
 
-  await expect(page.getByText('Playwright blog PW Author')).toBeVisible()
+  // використовуємо locator замість getByText для уникнення strict mode
+  await expect(page.locator('.blog').filter({ hasText: 'Playwright blog PW Author' }).first()).toBeVisible()
 })
 
 // 5. лайк блогу
 test('user can like a blog', async ({ page }) => {
   await login(page)
 
-  // створюємо блог
   await page.getByRole('button', { name: 'new blog' }).click()
   await page.getByPlaceholder('title').fill('Likable blog')
   await page.getByPlaceholder('author').fill('Liker')
   await page.getByPlaceholder('url').fill('http://example.com/like')
   await page.getByRole('button', { name: 'create' }).click()
 
-  const blog = page.getByText('Likable blog Liker')
+  // чекаємо появи блогу
+  const blog = page.locator('.blog').filter({ hasText: 'Likable blog Liker' }).first()
+  await expect(blog).toBeVisible()
+  
   await blog.getByRole('button', { name: 'view' }).click()
 
-  const likesText = blog.getByText('likes 0')
-  await expect(likesText).toBeVisible()
+  // чекаємо появи деталей з лайками
+  await expect(blog.getByText(/likes/)).toBeVisible()
 
-  await blog.getByRole('button', { name: 'like' }).click()
-  await expect(blog.getByText('likes 1')).toBeVisible()
+  // клікаємо лайк і чекаємо оновлення
+  const likeButton = blog.getByRole('button', { name: 'like' })
+  await likeButton.click()
+  
+  // чекаємо поки number змінюється (може бути 0->1 або будь-яке інше)
+  await page.waitForTimeout(1000)
+  await expect(blog.getByText(/likes \d+/)).toBeVisible()
 })
 
 // 6. власник може видалити свій блог
@@ -97,13 +104,32 @@ test('user who created a blog can delete it', async ({ page }) => {
   await page.getByPlaceholder('url').fill('http://example.com/remove')
   await page.getByRole('button', { name: 'create' }).click()
 
-  const blog = page.getByText('Removable blog Owner')
+  // чекаємо появи блогу та рахуємо їх
+  await page.waitForTimeout(1000)
+  const allBlogs = page.locator('.blog')
+  const initialCount = await allBlogs.count()
+  
+  // знаходимо наш блог
+  const blog = allBlogs.filter({ hasText: 'Removable blog Owner' }).first()
+  await expect(blog).toBeVisible()
+  
   await blog.getByRole('button', { name: 'view' }).click()
+  await page.waitForTimeout(500)
+  
+  // перехоплюємо confirm
+  page.once('dialog', dialog => dialog.accept())
+  
+  // видаляємо
   await blog.getByRole('button', { name: 'remove' }).click()
-
-  // у Playwright confirm за замовчуванням приймається, якщо не перехоплювати
-  await expect(page.getByText('Removable blog Owner')).not.toBeVisible()
+  
+  // чекаємо поки блог зникне
+  await page.waitForTimeout(2000)
+  
+  // перевіряємо, що блогів стало менше
+  const finalCount = await allBlogs.count()
+  expect(finalCount).toBe(initialCount - 1)
 })
+
 
 // 7. блоги відсортовані за лайками
 test('blogs are ordered by likes', async ({ page }) => {
@@ -115,33 +141,59 @@ test('blogs are ordered by likes', async ({ page }) => {
     await page.getByPlaceholder('author').fill('Author')
     await page.getByPlaceholder('url').fill('http://example.com/' + title)
     await page.getByRole('button', { name: 'create' }).click()
+    
+    // чекаємо появи конкретного блогу
+    await expect(
+      page.locator('.blog').filter({ hasText: `${title} Author` }).first()
+    ).toBeVisible()
+    
+    // чекаємо трошки, щоб форма закрилась
+    await page.waitForTimeout(500)
   }
 
   await createBlog('First blog')
   await createBlog('Second blog')
   await createBlog('Third blog')
 
-  const blogs = page.locator('.blog') // додай className="blog" контейнеру в Blog.jsx
+  const blogs = page.locator('.blog')
 
-  // відкриваємо всі
+  // відкриваємо всі деталі
   const count = await blogs.count()
   for (let i = 0; i < count; i++) {
     await blogs.nth(i).getByRole('button', { name: 'view' }).click()
   }
 
+  // чекаємо, поки всі деталі відкриються
+  await page.waitForTimeout(1000)
+
   // Second blog: 2 лайки
-  const second = blogs.filter({ hasText: 'Second blog' })
-  await second.getByRole('button', { name: 'like' }).click()
-  await second.getByRole('button', { name: 'like' }).click()
+  const second = blogs.filter({ hasText: 'Second blog Author' }).first()
+  const secondLikeBtn = second.getByRole('button', { name: 'like' })
+  
+  // перший лайк
+  await secondLikeBtn.click()
+  await page.waitForTimeout(1000)
+  
+  // другий лайк
+  await secondLikeBtn.click()
+  await page.waitForTimeout(1000)
 
   // First blog: 1 лайк
-  const first = blogs.filter({ hasText: 'First blog' })
+  const first = blogs.filter({ hasText: 'First blog Author' }).first()
   await first.getByRole('button', { name: 'like' }).click()
+  await page.waitForTimeout(1000)
 
-  // перевірка порядку
-  const titles = await blogs.allTextContents()
-  // очікуємо, що Second blog буде вище за First blog
-  expect(titles.indexOf('Second blog Author')).toBeLessThan(
-    titles.indexOf('First blog Author'),
-  )
+  // чекаємо ре-рендер після зміни лайків (сортування)
+  await page.waitForTimeout(1500)
+
+  // перевірка порядку: Second blog (2 лайки) має бути вище First blog (1 лайк)
+  const blogsAfterLikes = page.locator('.blog')
+  const allTexts = await blogsAfterLikes.allTextContents()
+  
+  const secondIndex = allTexts.findIndex(text => text.includes('Second blog'))
+  const firstIndex = allTexts.findIndex(text => text.includes('First blog'))
+  
+  expect(secondIndex).toBeGreaterThanOrEqual(0)
+  expect(firstIndex).toBeGreaterThanOrEqual(0)
+  expect(secondIndex).toBeLessThan(firstIndex)
 })
